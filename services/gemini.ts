@@ -78,6 +78,10 @@ export const analyzeStock = async (ticker: string): Promise<StockData> => {
 
     const text = response.text;
     
+    if (!text) {
+      throw new Error("Gemini AI 未返回任何文本响应。请稍后重试。");
+    }
+
     // Extract Sources
     let sources: GroundingSource[] = [];
     const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
