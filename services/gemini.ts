@@ -1,9 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { StockData, GroundingSource } from "../types";
 
-// Initialize Gemini Client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 const SYSTEM_INSTRUCTION = `
 你是一位世界级的资深金融分析师。你的任务是分析给定的股票代码，通过使用 'googleSearch' 工具搜索实时和历史数据来生成专业报告。
 
@@ -53,6 +50,16 @@ const SYSTEM_INSTRUCTION = `
 `;
 
 export const analyzeStock = async (ticker: string): Promise<StockData> => {
+  // Check for API Key validity
+  const apiKey = process.env.API_KEY;
+  if (!apiKey || apiKey === "undefined" || apiKey === "") {
+     throw new Error("API Key 未配置。请在部署环境设置 API_KEY。");
+  }
+
+  // Initialize Gemini Client Lazily inside the function
+  // This prevents the app from crashing on load if initialization fails
+  const ai = new GoogleGenAI({ apiKey: apiKey });
+
   try {
     const model = 'gemini-2.5-flash'; 
     
@@ -98,24 +105,34 @@ export const analyzeStock = async (ticker: string): Promise<StockData> => {
     // Parse JSON
     const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/);
     if (!jsonMatch) {
-        console.error("Raw response:", text);
-        throw new Error("解析 AI 响应失败。可能是因为没有返回有效的 JSON 格式。");
+        // Fallback: try to parse the whole text if no code block
+        try {
+            const data = JSON.parse(text) as StockData;
+            return processData(data, sources);
+        } catch (e) {
+            console.error("Raw response:", text);
+            throw new Error("解析 AI 响应失败。可能是因为没有返回有效的 JSON 格式。");
+        }
     }
 
     const jsonString = jsonMatch[1];
     const data = JSON.parse(jsonString) as StockData;
 
-    data.sources = sources;
-
-    // Post-process: Sort history by date ascending
-    if (data.history && Array.isArray(data.history)) {
-        data.history.sort((a, b) => a.date.localeCompare(b.date));
-    }
-
-    return data;
+    return processData(data, sources);
 
   } catch (error) {
     console.error("Gemini Analysis Error:", error);
     throw error;
   }
 };
+
+// Helper to process data (sort, add sources)
+function processData(data: StockData, sources: GroundingSource[]): StockData {
+    data.sources = sources;
+
+    // Post-process: Sort history by date ascending
+    if (data.history && Array.isArray(data.history)) {
+        data.history.sort((a, b) => a.date.localeCompare(b.date));
+    }
+    return data;
+}
