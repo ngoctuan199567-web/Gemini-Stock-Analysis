@@ -1,0 +1,5 @@
+{
+  "name": "Gemini Stock Analyst",
+  "description": "Real-time stock analysis and trend forecasting using Gemini with Google Search Grounding.",
+  "requestFramePermissions": []
+}
